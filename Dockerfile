@@ -14,7 +14,3 @@ COPY icon.svg /usr/share/nginx/html/
 
 # Port 80 für das interne Docker-Netzwerk öffnen
 EXPOSE 80
-
-# Korrigierter Healthcheck auf Port 80
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
