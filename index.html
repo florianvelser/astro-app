@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Milchstraßen & Wetter Planer V8</title>
+    
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="description" content="Berechnet das reale Fotofenster inkl. stündlicher Wolkenprognose und Live-Score-Abzug.">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Milchstraßen Planer">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #151a28;
+            --border-color: #232b3e;
+            --text-main: #e2e8f0;
+            --text-muted: #8a99ad;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --good-bg: rgba(16, 185, 129, 0.2);
+            --good-text: #34d399;
+            --mid-bg: rgba(245, 158, 11, 0.2);
+            --mid-text: #fbbf24;
+            --bad-bg: rgba(239, 68, 68, 0.2);
+            --bad-text: #f87171;
+        }
+
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 20px; 
+            line-height: 1.5;
+        }
+
+        h1 { color: #fff; font-size: 1.8rem; margin-bottom: 0.5rem; }
+        p { color: var(--text-muted); margin-bottom: 2rem; }
+
+        .container { 
+            max-width: 1100px; 
+            margin: 0 auto; 
+            background: var(--card-bg); 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); 
+            border: 1px solid var(--border-color);
+        }
+
+        .inputs { 
+            display: flex; 
+            gap: 15px; 
+            margin-bottom: 30px; 
+            flex-wrap: wrap; 
+            align-items: flex-end; 
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        .input-group label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        
+        input { 
+            padding: 10px 15px; 
+            border-radius: 6px; 
+            border: 1px solid var(--border-color); 
+            background: var(--bg-color); 
+            color: #fff; 
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: var(--accent-color); }
+
+        button { 
+            padding: 10px 20px; 
+            border-radius: 6px; 
+            background: var(--accent-color); 
+            color: #fff; 
+            font-size: 1rem;
+            font-weight: bold; 
+            cursor: pointer; 
+            border: none; 
+            transition: all 0.2s; 
+            height: 42px; 
+        }
+        button:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0; 
+            margin-top: 10px; 
+        }
+
+        th, td { 
+            padding: 16px 18px; 
+            text-align: left; 
+            vertical-align: middle; 
+        }
+
+        /* Desktop: normale Tabelle */
+        @media (min-width: 851px) {
+            td.mobile-accordion {
+                display: none !important;
+            }
+
+            td.desktop-only {
+                display: table-cell !important;
+            }
+
+            tr.data-row {
+                background: transparent !important;
+                border: 1px solid var(--border-color) !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                cursor: default !important;
+            }
+
+            tr.data-row:hover {
+                background: rgba(255,255,255,0.02) !important;
+                border-color: var(--border-color) !important;
+            }
+        }
+
+        table tbody td.desktop-only:last-child {
+            text-align: right;
+        }
+
+        th { 
+            background: rgba(0,0,0,0.2); 
+            color: var(--text-muted); 
+            font-size: 0.85rem; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        tr.data-row { border-bottom: 1px solid var(--border-color); transition: background 0.2s; }
+
+        .badge { 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 0.95rem; 
+            font-weight: bold; 
+            display: inline-block;
+            text-align: center;
+            min-width: 50px;
+        }
+        .good-score { background: var(--good-bg); color: var(--good-text); }
+        .mid-score { background: var(--mid-bg); color: var(--mid-text); }
+        .bad-score { background: var(--bad-bg); color: var(--bad-text); }
+        
+        .hint { font-size: 0.8rem; color: #64748b; display: block; margin-top: 4px; }
+        .time-text { font-size: 0.95rem; font-weight: 500; }
+
+        /* Wetter Pillen Verlauf */
+        .weather-track { display: flex; gap: 8px; flex-wrap: wrap; }
+        .cloud-box { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 4px 8px; 
+            border-radius: 6px; 
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            min-width: 40px;
+        }
+        .cloud-box span.time { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; }
+        .cloud-box span.val { font-size: 0.85rem; font-weight: bold; }
+        
+        .cloud-good { color: var(--good-text); border-color: rgba(52, 211, 153, 0.3); }
+        .cloud-mid { color: var(--mid-text); border-color: rgba(251, 191, 36, 0.3); }
+        .cloud-bad { color: var(--bad-text); border-color: rgba(248, 113, 113, 0.3); }
+
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .leaflet-container { background: #1a1f2e; }
+        .leaflet-tile { filter: invert(0.9) hue-rotate(180deg); }
+        .leaflet-control-attribution { background: rgba(0,0,0,0.7) !important; }
+
+        .map-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .location-info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+
+        .location-info.hidden { display: none; }
+
+        /* Mobile Layout - Collapsible Accordion */
+        @media (max-width: 850px) {
+            .inputs { flex-direction: column; align-items: stretch; }
+            .input-group, button { width: 100%; }
+            .map-controls { flex-direction: column; }
+            .map-controls button { width: 100%; }
+            #map { height: 300px; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead tr { position: absolute; top: -9999px; left: -9999px; }
+            
+            tr.data-row { 
+                margin-bottom: 12px; 
+                background: rgba(0,0,0,0.2); 
+                border: 1px solid var(--border-color); 
+                border-radius: 8px; 
+                padding: 0;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+
+            tr.data-row:hover {
+                background: rgba(0,0,0,0.3);
+                border-color: var(--accent-color);
+            }
+
+            td.desktop-only { display: none !important; }
+
+            td.mobile-accordion {
+                display: block !important;
+                border: none !important;
+                padding: 0 !important;
+            }
+
+            .collapse-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 14px 16px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .collapse-header .date-col {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex: 1;
+            }
+
+            .collapse-header strong { font-size: 1rem; }
+
+            .collapse-header .score-wrapper {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .collapse-header .badge {
+                margin: 0;
+                min-width: 60px;
+            }
+
+            .collapse-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                color: var(--text-muted);
+                font-size: 0.95rem;
+                user-select: none;
+            }
+
+            .collapse-toggle::before {
+                content: "▼";
+            }
+
+            tr.data-row.expanded .collapse-toggle::before {
+                content: "▲";
+            }
+
+            .collapse-details {
+                display: none;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                padding: 16px;
+                background: rgba(0,0,0,0.3);
+            }
+
+            tr.data-row.expanded .collapse-details {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 14px;
+                padding-bottom: 12px;
+            }
+
+            .detail-item {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .detail-label {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .detail-value {
+                font-size: 0.95rem;
+                color: var(--text-main);
+                word-break: break-word;
+            }
+
+            .detail-item .weather-track {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                justify-content: flex-start;
+            }
+
+            .detail-item .cloud-box {
+                min-width: 35px;
+                padding: 3px 6px;
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Milchstraßen & Wetter Planer</h1>
+    <p>Berechnet das reale Fotofenster inkl. stündlicher Wolkenprognose und Live-Score-Abzug.</p>
+    
+    <div id="map"></div>
+
+    <div class="location-info hidden" id="locationInfo">
+        <strong>📍 Ausgewählter Ort:</strong> <span id="locationText">Keine Position ausgewählt</span>
+    </div>
+
+    <div class="map-controls">
+        <button id="useCurrentLocationBtn" onclick="useCurrentLocation()">📍 Aktuelle Position verwenden</button>
+    </div>
+
+    <input type="hidden" id="lat" value="51.1657">
+    <input type="hidden" id="lon" value="10.4515">
+
+    <table>
+        <thead>
+            <tr>
+                <th>Datum</th>
+                <th>Mond</th>
+                <th>Fotofenster</th>
+                <th>Höhe</th>
+                <th>Wolken-Verlauf (im Fenster)</th>
+                <th>Score</th>
+            </tr>
+        </thead>
+        <tbody id="results">
+        </tbody>
+    </table>
+</div>
+
+<script>
+let map, marker;
+
+function initMap() {
+    map = L.map('map').setView([51.1657, 10.4515], 6);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    marker = L.circleMarker([51.1657, 10.4515], {
+        radius: 8,
+        fillColor: '#3b82f6',
+        color: '#2563eb',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+    }).addTo(map);
+
+    map.on('click', function(e) {
+        setLocation(e.latlng.lat, e.latlng.lng);
+    });
+
+    updateLocationDisplay();
+}
+
+function setLocation(lat, lon) {
+    document.getElementById('lat').value = parseFloat(lat.toFixed(4));
+    document.getElementById('lon').value = parseFloat(lon.toFixed(4));
+    
+    if (marker) {
+        marker.setLatLng([lat, lon]);
+    }
+    
+    map.setView([lat, lon], map.getZoom());
+    updateLocationDisplay();
+    startBerechnung();
+}
+
+function updateLocationDisplay() {
+    const lat = parseFloat(document.getElementById('lat').value);
+    const lon = parseFloat(document.getElementById('lon').value);
+    const locationInfo = document.getElementById('locationInfo');
+    const locationText = document.getElementById('locationText');
+    
+    if (!isNaN(lat) && !isNaN(lon)) {
+        locationInfo.classList.remove('hidden');
+        locationText.textContent = `${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E`;
+    } else {
+        locationInfo.classList.add('hidden');
+    }
+}
+
+function useCurrentLocation() {
+    const btn = document.getElementById('useCurrentLocationBtn');
+    btn.innerText = "Ermittle Position...";
+    btn.disabled = true;
+    
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                setLocation(lat, lon);
+                btn.innerText = "✓ Position gefunden";
+                setTimeout(() => {
+                    btn.innerText = "📍 Aktuelle Position verwenden";
+                    btn.disabled = false;
+                }, 1500);
+            },
+            function(error) {
+                alert('Position konnte nicht ermittelt werden: ' + error.message);
+                btn.innerText = "📍 Aktuelle Position verwenden";
+                btn.disabled = false;
+            }
+        );
+    } else {
+        alert('Geolocation wird von Ihrem Browser nicht unterstützt.');
+        btn.innerText = "📍 Aktuelle Position verwenden";
+        btn.disabled = false;
+    }
+}
+
+function getMilkyWayAltitude(date, lat, lon) {
+    const time = date.getTime();
+    const julianDate = (time / 86400000) + 2440587.5;
+    const T = (julianDate - 2451545.0) / 36525.0; 
+    let gmst = 280.46061837 + 360.98564736629 * (julianDate - 2451545.0) + 0.000387933 * T * T - T * T * T / 38710000.0;
+    gmst = gmst % 360; if (gmst < 0) gmst += 360;
+    let lst = (gmst + lon) % 360; if (lst < 0) lst += 360;
+    const ra = 266.42, dec = -29.01; 
+    let ha = lst - ra; if (ha < 0) ha += 360;
+    const latRad = lat * (Math.PI / 180), decRad = dec * (Math.PI / 180), haRad = ha * (Math.PI / 180);
+    const sinAlt = Math.sin(decRad) * Math.sin(latRad) + Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad);
+    return Math.asin(sinAlt) * (180 / Math.PI); 
+}
+
+// --- Hilfsfunktion ---
+function isInvalidDate(d) { return !d || isNaN(d.getTime()); }
+
+async function fetchWeatherData(lat, lon) {
+    const rLat = Math.round(lat * 10) / 10;
+    const rLon = Math.round(lon * 10) / 10;
+    const cacheKey = `meteo_${rLat}_${rLon}`;
+    
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+        const data = JSON.parse(cached);
+        if ((Date.now() - data.timestamp) < 15 * 60000) {
+            return data.map;
+        }
+    }
+
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${rLat}&longitude=${rLon}&hourly=cloud_cover&forecast_days=16`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("API Fehler");
+        
+        const json = await res.json();
+        const weatherMap = {};
+        
+        json.hourly.time.forEach((tStr, index) => {
+            const unixTime = new Date(tStr + "Z").getTime();
+            weatherMap[unixTime] = json.hourly.cloud_cover[index];
+        });
+
+        localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), map: weatherMap }));
+        return weatherMap;
+    } catch (error) {
+        console.error("Wetter konnte nicht geladen werden:", error);
+        return null;
+    }
+}
+
+async function startBerechnung() {
+    const lat = parseFloat(document.getElementById('lat').value);
+    const lon = parseFloat(document.getElementById('lon').value);
+    const tbody = document.getElementById('results');
+    tbody.innerHTML = '';
+
+    const weatherMap = await fetchWeatherData(lat, lon);
+    const heute = new Date();
+
+    for (let i = 0; i < 30; i++) {
+        let pruefDatum = new Date(heute);
+        pruefDatum.setDate(heute.getDate() + i);
+        let morgen = new Date(pruefDatum);
+        morgen.setDate(morgen.getDate() + 1);
+        
+        const moonIllum = SunCalc.getMoonIllumination(pruefDatum);
+        const moonPct = Math.round(moonIllum.fraction * 100);
+        
+        const sunTimesHeute = SunCalc.getTimes(pruefDatum, lat, lon);
+        const sunTimesMorgen = SunCalc.getTimes(morgen, lat, lon);
+
+        const nadir = sunTimesHeute.nadir;
+        const sunPosNadir = SunCalc.getPosition(nadir, lat, lon);
+        const minSunAlt = sunPosNadir.altitude * (180 / Math.PI); 
+
+        let nachtsBeginn = sunTimesHeute.night; 
+        let nachtsEnde = sunTimesMorgen.nightEnd; 
+
+        if (isInvalidDate(nachtsBeginn) || isInvalidDate(nachtsEnde)) {
+            nachtsBeginn = sunTimesHeute.nauticalDark;
+            nachtsEnde = sunTimesMorgen.nauticalDawn;
+        }
+
+        if (isInvalidDate(nachtsBeginn) || isInvalidDate(nachtsEnde)) {
+            nachtsBeginn = new Date(pruefDatum); nachtsBeginn.setHours(23, 30, 0);
+            nachtsEnde = new Date(morgen); nachtsEnde.setHours(2, 30, 0);
+        }
+        
+        let startFenster = null;
+        let endeFenster = null;
+        let maxMwAlt = -90;
+
+        let aktuelleZeit = new Date(nachtsBeginn);
+        while (aktuelleZeit <= nachtsEnde) {
+            const moonPos = SunCalc.getMoonPosition(aktuelleZeit, lat, lon);
+            const mwAlt = getMilkyWayAltitude(aktuelleZeit, lat, lon);
+            
+            if (mwAlt > maxMwAlt) maxMwAlt = mwAlt;
+            let mondStoert = (moonPos.altitude > 0) && (moonIllum.fraction > 0.10);
+
+            if (!mondStoert && mwAlt > 0) {
+                if (!startFenster) startFenster = new Date(aktuelleZeit);
+                endeFenster = new Date(aktuelleZeit);
+            }
+            aktuelleZeit.setMinutes(aktuelleZeit.getMinutes() + 10);
+        }
+
+        let score = 0;
+        let fensterHtml = `<span class="hint">Kein Fenster</span>`;
+        let wolkenHtml = "-";
+
+        if (startFenster && endeFenster && maxMwAlt > 2) {
+            const dauerMinuten = Math.round((endeFenster - startFenster) / 60000);
+            
+            const zeitScore = Math.min(dauerMinuten / 120, 1) * 50; 
+            const hoehenScore = Math.min(Math.max(maxMwAlt, 0) / 10, 1) * 50; 
+            let daemmerungsAbzug = minSunAlt > -18 ? (minSunAlt + 18) * 5 : 0;
+            let astroScore = Math.max(0, zeitScore + hoehenScore - daemmerungsAbzug);
+
+            let gesamtWolken = 0;
+            let wolkenDatenPunkte = 0;
+
+            if (weatherMap) {
+                let stundenStart = new Date(startFenster);
+                stundenStart.setMinutes(0,0,0);
+                let stundenEnde = new Date(endeFenster);
+                stundenEnde.setMinutes(0,0,0);
+                if (endeFenster.getMinutes() > 0) stundenEnde.setHours(stundenEnde.getHours() + 1);
+
+                wolkenHtml = `<div class="weather-track">`;
+                
+                let checkTime = new Date(stundenStart);
+                let hatDaten = false;
+
+                while (checkTime <= stundenEnde) {
+                    const t = checkTime.getTime();
+                    if (weatherMap[t] !== undefined) {
+                        hatDaten = true;
+                        let cover = weatherMap[t];
+                        gesamtWolken += cover;
+                        wolkenDatenPunkte++;
+
+                        let farbKlasse = 'cloud-good';
+                        if (cover > 50) farbKlasse = 'cloud-bad';
+                        else if (cover > 20) farbKlasse = 'cloud-mid';
+
+                        let zeigeZeit = checkTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        wolkenHtml += `
+                            <div class="cloud-box ${farbKlasse}">
+                                <span class="time">${zeigeZeit}</span>
+                                <span class="val">${cover}%</span>
+                            </div>`;
+                    }
+                    checkTime.setHours(checkTime.getHours() + 1);
+                }
+                wolkenHtml += `</div>`;
+                if (!hatDaten) wolkenHtml = `<span class="hint">Keine Wetterprognose (Zu weit in der Zukunft)</span>`;
+            } else {
+                wolkenHtml = `<span class="hint">Wetter offline</span>`;
+            }
+
+            if (wolkenDatenPunkte > 0) {
+                let durchschnittsWolken = gesamtWolken / wolkenDatenPunkte;
+                astroScore = astroScore * (1 - (durchschnittsWolken / 100));
+            }
+
+            score = Math.round(astroScore);
+            
+            let warnText = minSunAlt > -18 ? `<span class="hint">Hell (Sonne max ${minSunAlt.toFixed(1)}°)</span>` : "";
+            fensterHtml = `
+                <div class="time-text">${startFenster.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endeFenster.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                <span class="hint">Dauer: ${dauerMinuten} Min.</span>
+                ${warnText}
+            `;
+        }
+
+        let scoreClass = 'bad-score';
+        if (score > 65) scoreClass = 'good-score';
+        else if (score >= 35) scoreClass = 'mid-score';
+
+        const datumStr = pruefDatum.toLocaleDateString('de-DE', {weekday: 'short', day: '2-digit', month: '2-digit'});
+        const hoeheTxt = maxMwAlt > 0 ? `${Math.round(maxMwAlt)}°` : '-';
+
+        const zeile = `
+            <tr class="data-row">
+                <td colspan="6" class="mobile-accordion">
+                    <div class="collapse-header">
+                        <div class="date-col">
+                            <strong>${datumStr}</strong>
+                        </div>
+                        <div class="score-wrapper">
+                            <span class="badge ${scoreClass}">${score}</span>
+                            <span class="collapse-toggle"></span>
+                        </div>
+                    </div>
+                    <div class="collapse-details">
+                        <div class="detail-item">
+                            <div class="detail-label">Mond</div>
+                            <div class="detail-value">${moonPct}%</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Höhe</div>
+                            <div class="detail-value">${hoeheTxt}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Fotofenster</div>
+                            <div class="detail-value">${fensterHtml}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Wolken-Verlauf</div>
+                            <div class="detail-value">${wolkenHtml}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="desktop-only" data-label="Datum"><strong>${datumStr}</strong></td>
+                <td class="desktop-only" data-label="Mond">${moonPct}%</td>
+                <td class="desktop-only" data-label="Fotofenster">${fensterHtml}</td>
+                <td class="desktop-only" data-label="Höhe">${hoeheTxt}</td>
+                <td class="desktop-only" data-label="Wolken-Verlauf">${wolkenHtml}</td>
+                <td class="desktop-only" data-label="Score"><span class="badge ${scoreClass}">${score}</span></td>
+            </tr>
+        `;
+        tbody.innerHTML += zeile;
+    }
+    
+    attachAccordionListeners();
+}
+
+function attachAccordionListeners() {
+    document.querySelectorAll('tbody tr.data-row').forEach(row => {
+        row.addEventListener('click', function(e) {
+            if (window.innerWidth <= 850) {
+                e.stopPropagation();
+                this.classList.toggle('expanded');
+            }
+        });
+    });
+}
+
+window.onload = function() {
+    initMap();
+    startBerechnung();
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker registriert'))
+            .catch(err => console.log('Service Worker Fehler:', err));
+    }
+};
+</script>
+</body>
+</html>
