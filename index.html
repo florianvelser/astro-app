@@ -477,12 +477,11 @@ function getMilkyWayAltitude(date, lat, lon) {
     return Math.asin(sinAlt) * (180 / Math.PI); 
 }
 
-// --- Hilfsfunktion ---
 function isInvalidDate(d) { return !d || isNaN(d.getTime()); }
 
 async function fetchWeatherData(lat, lon) {
-    const rLat = Math.round(lat * 10) / 10;
-    const rLon = Math.round(lon * 10) / 10;
+    const rLat = Math.round(lat * 100) / 100; 
+    const rLon = Math.round(lon * 100) / 100;
     const cacheKey = `meteo_${rLat}_${rLon}`;
     
     const cached = localStorage.getItem(cacheKey);
@@ -526,6 +525,8 @@ async function startBerechnung() {
     for (let i = 0; i < 30; i++) {
         let pruefDatum = new Date(heute);
         pruefDatum.setDate(heute.getDate() + i);
+        pruefDatum.setHours(23, 59, 59, 0);
+        
         let morgen = new Date(pruefDatum);
         morgen.setDate(morgen.getDate() + 1);
         
