@@ -3,6 +3,9 @@ FROM nginx:alpine
 LABEL org.opencontainers.image.title="Astro Planer"
 LABEL org.opencontainers.image.description="PWA zur Berechnung optimaler Fotofenster für Milchstraßenfotografie"
 
+# Alpine-Pakete auf die neuesten Sicherheitspatches aktualisieren
+RUN apk update && apk upgrade --no-cache
+
 # Kopiere die minimale Nginx-Konfiguration
 COPY nginx.conf /etc/nginx/nginx.conf
 
