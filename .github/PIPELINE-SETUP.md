@@ -25,6 +25,8 @@ git push origin v1.0.0
 - **Auf `main` Push**: Build + Push als `main` Tag
 - **Release Tag** (v1.0.0): Build + Push mit `v1.0.0`, `1.0`, `1` Tags
 - **Pull Requests**: Build ohne Push (nur Validierung)
+- **Wöchentlich (Montag 06:00 UTC)**: Rebuild + Push als `latest`, damit `apk upgrade` im Dockerfile neue Alpine-Sicherheitspatches einspielt, auch ohne Code-Änderung
+- **Manuell** (`workflow_dispatch`): jederzeit über den "Run workflow"-Button auslösbar
 
 ### Optimierung durch Caching
 - **GitHub Actions Cache** (gha): Speichert Docker Layer zwischen Runs

@@ -9,6 +9,11 @@ on:
   pull_request:
     branches:
       - main
+  schedule:
+    # Wöchentlicher Rebuild, damit sicherheitsrelevante Alpine-/Nginx-Patches
+    # (via "apk upgrade" im Dockerfile) auch ohne Code-Änderung ins Image kommen
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
 
 env:
   REGISTRY: ghcr.io
@@ -43,9 +48,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
+            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=sha,prefix={{branch}}-,enable=${{ github.event_name != 'pull_request' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
